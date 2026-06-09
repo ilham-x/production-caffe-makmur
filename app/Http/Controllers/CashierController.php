@@ -3,165 +3,377 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+
 use App\Models\Produk;
 use App\Models\Meja;
 use App\Models\Pesanan;
 use App\Models\Detail_Pesanan;
+use App\Models\Komplain;
+use App\Models\Transaksi;
+
 use Illuminate\Support\Str;
+use Carbon\Carbon;
+
+// XENDIT
+use Xendit\Configuration;
+use Xendit\Refund\RefundApi;
 
 class CashierController extends Controller
 {
+
+    /*
+    |--------------------------------------------------------------------------
+    | DASHBOARD
+    |--------------------------------------------------------------------------
+    */
+
     public function index()
     {
-        $anjlok = Produk::all();
+        $user = auth()->user();
+
+        $waktuShift = !empty($user->waktu_shift)
+            ? $user->waktu_shift
+            : '00:00:00';
+
+        $waktuSelesaiShift = !empty($user->waktu_selesai_shift)
+            ? $user->waktu_selesai_shift
+            : '23:59:59';
+
+        $produk = Produk::all();
+
         $meja = Meja::all();
 
         $pesanans = Pesanan::with('detail.produk')
-                    ->orderBy('created_at','desc')
-                    ->get();
+            ->whereDate('created_at', Carbon::today())
+            ->whereTime('created_at', '>=', $waktuShift)
+            ->whereTime('created_at', '<=', $waktuSelesaiShift)
+            ->orderBy('created_at', 'desc')
+            ->get();
 
-        return view("cashier.dashboard", compact("anjlok","meja","pesanans"));
+        $komplains = Komplain::with(['pesanan', 'produk'])
+            ->whereHas('pesanan', function ($query) use ($waktuShift, $waktuSelesaiShift) {
+                $query->whereDate('created_at', Carbon::today())
+                    ->whereTime('created_at', '>=', $waktuShift)
+                    ->whereTime('created_at', '<=', $waktuSelesaiShift);
+            })
+            ->latest()
+            ->get();
+
+        $transaksis = Transaksi::whereDate('created_at', Carbon::today())
+            ->whereTime('created_at', '>=', $waktuShift)
+            ->whereTime('created_at', '<=', $waktuSelesaiShift)
+            ->latest()
+            ->get();
+
+        return response()->json([
+            'success'    => true,
+            'data'       => [
+                'produk'     => $produk,
+                'meja'       => $meja,
+                'pesanans'   => $pesanans,
+                'komplains'  => $komplains,
+                'transaksis' => $transaksis,
+            ]
+        ]);
     }
 
-    // ================= CART =================
+    /*
+    |--------------------------------------------------------------------------
+    | TOGGLE MEJA
+    |--------------------------------------------------------------------------
+    */
 
-    public function addToCart(Request $request)
+    public function toggleMeja($id)
     {
-        $cart = session()->get('cart', []);
+        $meja = Meja::findOrFail($id);
 
-        $id = $request->produk_id;
+        $meja->status = $meja->status == 'aktif'
+            ? 'nonaktif'
+            : 'aktif';
 
-        if(isset($cart[$id])){
-            $cart[$id]['qty']++;
-        } else {
-            $cart[$id] = [
-                "produk_id" => $id,
-                "nama" => $request->nama,
-                "harga" => $request->harga,
-                "qty" => 1
-            ];
-        }
-
-        session()->put('cart', $cart);
-
-        return back();
-    }
-
-  public function updateCart(Request $request)
-{
-    try {
-        $cart = session()->get('cart', []);
-
-        if(isset($cart[$request->produk_id])){
-            $cart[$request->produk_id]['qty'] += $request->type == 'plus' ? 1 : -1;
-
-            if($cart[$request->produk_id]['qty'] <= 0){
-                unset($cart[$request->produk_id]);
-            }
-        }
-
-        session()->put('cart', $cart);
+        $meja->save();
 
         return response()->json([
             'success' => true,
-            'cart' => $cart
+            'status'  => $meja->status
         ]);
-
-    } catch (\Exception $e) {
-        return response()->json([
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
+
+    /*
+    |--------------------------------------------------------------------------
+    | ADD TO CART
+    | cart sekarang dari frontend (localStorage), 
+    | method ini opsional / bisa dihapus
+    |--------------------------------------------------------------------------
+    */
+
+    public function addToCart(Request $request)
+    {
+        // cart dihandle di frontend (localStorage)
+        // kalau mau tetap server-side, bisa pakai DB cart per user
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Gunakan localStorage di frontend'
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE CART
+    |--------------------------------------------------------------------------
+    */
+
+    public function updateCart(Request $request)
+    {
+        // cart dihandle di frontend (localStorage)
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Gunakan localStorage di frontend'
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE CART
+    |--------------------------------------------------------------------------
+    */
 
     public function deleteCart(Request $request)
     {
-        $cart = session()->get('cart', []);
-        unset($cart[$request->produk_id]);
-        session()->put('cart', $cart);
+        // cart dihandle di frontend (localStorage)
 
-        return response()->json(['success'=>true]);
+        return response()->json([
+            'success' => true,
+            'message' => 'Gunakan localStorage di frontend'
+        ]);
     }
 
-    // ================= STATUS =================
+    /*
+    |--------------------------------------------------------------------------
+    | UPDATE STATUS PESANAN
+    |--------------------------------------------------------------------------
+    */
 
     public function updateStatus(Request $request, $id)
-{
-    $pesanan = Pesanan::findOrFail($id);
+    {
+        $pesanan = Pesanan::findOrFail($id);
 
-    $pesanan->update([
-        'status' => $request->status
-    ]);
+        $pesanan->status = $request->status;
 
-    return back();
-}
-    // ================= BAYAR =================
+        $pesanan->save();
 
-    public function bayar(Request $request, $id)
-{
-    $pesanan = Pesanan::findOrFail($id);
-
-    // kalau cash
-    if($pesanan->metode_pembayaran == 'cash'){
-
-        $bayar = $request->bayar;
-        $kembalian = $bayar - $pesanan->total_harga;
-
-        if($kembalian < 0){
-            return back()->with('error','Uang kurang');
-        }
-
+        return response()->json([
+            'success' => true,
+            'message' => 'Status berhasil diubah',
+            'data'    => $pesanan
+        ]);
     }
 
-    // non-cash langsung lolos
-    $pesanan->update([
-        'status' => 'dibayar'
-    ]);
+    /*
+    |--------------------------------------------------------------------------
+    | BAYAR
+    |--------------------------------------------------------------------------
+    */
 
-    return back()->with('success','Pembayaran berhasil');
-}
-    // ================= STRUK =================
+    public function bayar(Request $request, $id)
+    {
+        $pesanan = Pesanan::findOrFail($id);
+
+        if ($pesanan->metode_pembayaran == 'cash') {
+
+            $bayar     = (int) $request->bayar;
+            $kembalian = $bayar - $pesanan->total_harga;
+
+            if ($kembalian < 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Uang kurang'
+                ], 422);
+            }
+
+            $transaksi = Transaksi::where('pesanan_id', $pesanan->id)->first();
+
+            if ($transaksi) {
+                $transaksi->status = 'paid';
+                $transaksi->save();
+            }
+
+            $pesanan->status = 'dibayar';
+            $pesanan->save();
+
+            return response()->json([
+                'success'   => true,
+                'message'   => 'Pembayaran berhasil',
+                'kembalian' => $kembalian,
+                'data'      => $pesanan
+            ]);
+        }
+
+        $pesanan->status = 'dibayar';
+        $pesanan->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pembayaran berhasil',
+            'data'    => $pesanan
+        ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | STRUK
+    | sekarang return data JSON, render HTML-nya di frontend
+    |--------------------------------------------------------------------------
+    */
 
     public function struk($id)
     {
         $pesanan = Pesanan::with('detail.produk')->findOrFail($id);
-        return view('struk', compact('pesanan'));
-    }
-   public function checkout(Request $request)
-{
-    $cart = session('cart');
 
-    if(!$cart){
-        return back()->with('error','Cart kosong');
-    }
-   
-    $total = 0;
-    foreach($cart as $item){
-        $total += $item['harga'] * $item['qty'];
-    }
-    
-    $pesanan = Pesanan::create([
-        'kode_pesanan' => 'PSN-'.Str::random(6),
-        'nama_pelanggan' => $request->nama_pelanggan,
-        'nomor_meja' => $request->nomor_meja,
-        'total_harga' => $total,
-        'status' => 'pending_payment',
-        'metode_pembayaran' => $request->metode_pembayaran
-    ]);
-
-    foreach($cart as $item){
-        Detail_Pesanan::create([
-            'pesanan_id' => $pesanan->id,
-            'produk_id' => $item['produk_id'],
-            'qty' => $item['qty'],
-            'harga' => $item['harga'],
-            'subtotal' => $item['harga'] * $item['qty']
+        return response()->json([
+            'success' => true,
+            'data'    => $pesanan
         ]);
     }
 
-    session()->forget('cart');
+    /*
+    |--------------------------------------------------------------------------
+    | CHECKOUT
+    | cart dikirim dari frontend sebagai array JSON di request body
+    |--------------------------------------------------------------------------
+    */
 
-    return back()->with('success','Pesanan dibuat');
-}
+    public function checkout(Request $request)
+    {
+        $cart = $request->input('cart');
 
+        if (!$cart || count($cart) === 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cart kosong'
+            ], 422);
+        }
+
+        $total = 0;
+
+        foreach ($cart as $item) {
+            $total += ((int) $item['harga']) * ((int) $item['qty']);
+        }
+
+        $pesanan = Pesanan::create([
+            'kode_pesanan'      => 'PSN-' . strtoupper(Str::random(6)),
+            'nama_pelanggan'    => $request->nama_pelanggan,
+            'nomor_meja'        => $request->nomor_meja,
+            'total_harga'       => $total,
+            'refund_total'      => 0,
+            'status'            => 'pending_payment',
+            'metode_pembayaran' => $request->metode_pembayaran
+        ]);
+
+        foreach ($cart as $item) {
+            Detail_Pesanan::create([
+                'pesanan_id' => $pesanan->id,
+                'produk_id'  => $item['produk_id'],
+                'qty'        => $item['qty'],
+                'harga'      => $item['harga'],
+                'subtotal'   => ((int) $item['harga']) * ((int) $item['qty'])
+            ]);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Pesanan berhasil dibuat',
+            'data'    => $pesanan->load('detail.produk')
+        ], 201);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | APPROVE KOMPLAIN
+    |--------------------------------------------------------------------------
+    */
+
+    public function approveKomplain($id)
+    {
+        try {
+
+            $komplain = Komplain::findOrFail($id);
+            $pesanan  = Pesanan::findOrFail($komplain->pesanan_id);
+
+            $detail = Detail_Pesanan::where('pesanan_id', $pesanan->id)
+                ->where('produk_id', $komplain->produk_id)
+                ->first();
+
+            if (!$detail) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Detail pesanan tidak ditemukan'
+                ], 404);
+            }
+
+            $refundAmount = (int) $detail->subtotal;
+
+            $pesanan->refund_total = ((int) $pesanan->refund_total) + $refundAmount;
+            $pesanan->status       = 'refund';
+            $pesanan->save();
+
+            $komplain->status = 'refund';
+            $komplain->save();
+
+            $transaksi = Transaksi::where('pesanan_id', $pesanan->id)->first();
+
+            if ($pesanan->metode_pembayaran == 'online' && $transaksi) {
+
+                Configuration::setXenditKey(
+                    config('services.xendit.secret_key')
+                );
+
+                $refundApi = new RefundApi();
+
+                $refundApi->createRefund([
+                    'data' => [
+                        'invoice_id' => $transaksi->invoice_id,
+                        'amount'     => (float) $refundAmount,
+                        'reason'     => 'Komplain customer'
+                    ]
+                ]);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Komplain berhasil direfund',
+                'data'    => $komplain
+            ]);
+
+        } catch (\Exception $e) {
+
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REJECT KOMPLAIN
+    |--------------------------------------------------------------------------
+    */
+
+    public function rejectKomplain($id)
+    {
+        $komplain = Komplain::findOrFail($id);
+
+        $komplain->status = 'ditolak';
+
+        $komplain->save();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Komplain ditolak',
+            'data'    => $komplain
+        ]);
+    }
 }

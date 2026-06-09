@@ -28,6 +28,6 @@
     </div>
 
     {{-- Detail Produk --}}
-   
+   1
 </div>
 @endsection

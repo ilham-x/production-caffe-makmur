@@ -1,6 +1,7 @@
+
 @extends('admin.layout')
 
-@section('title','Tambah Kasir')
+@section('title','Edit Kasir')
 
 @section('content')
 
@@ -14,34 +15,35 @@
         </div>
     @endif
 
-    <form action="{{ route('admin.kasir.store') }}" method="POST">
+    <form action="{{ route('admin.kasir.update',$kasir->id) }}" method="POST">
         @csrf
+        @method('PUT')
 
         <div style="margin-bottom:15px;">
             <label>Nama</label><br>
-            <input type="text" name="name" value="{{ old('name') }}" required>
+            <input type="text" name="name" value="{{ old('name', $kasir->name) }}" required>
         </div>
 
         <div style="margin-bottom:15px;">
             <label>Email</label><br>
-            <input type="email" name="email" value="{{ old('email') }}" required>
+            <input type="email" name="email" value="{{ old('email', $kasir->email) }}" required>
         </div>
 
         <div style="margin-bottom:15px;">
             <label>Password</label><br>
-            <input type="password" name="password" required>
+            <input type="password" name="password" placeholder="Kosongkan jika tidak ingin mengganti password">
         </div>
         <div style="margin-bottom:15px;">
             <label>Shift</label><br>
-            <input type="input" name="shift" id="shift" required readonly>
+            <input type="input" name="shift" id="shift" value="{{ old('shift', $kasir->shift) }}" required readonly>
 </div>
         <div style="margin-bottom:15px;">
             <label>Waktu Mulai Shift</label><br>
-            <input type="text" name="waktu_shift" id="waktu_shift" value="{{ old('waktu_shift') }}"  lang="id" required>
+            <input type="time" name="waktu_shift" id="waktu_shift" value="{{ old('waktu_shift', $kasir->waktu_shift) }}"  lang="en-GB" required>
         </div>
         <div style="margin-bottom:15px;">
             <label>Waktu Selesai Shift</label><br>
-            <input type="time" name="waktu_selesai_shift" id="waktu_selesai_shift" value="{{ old('waktu_selesai_shift') }}"  lang="en-GB" required>
+            <input type="time" name="waktu_selesai_shift" id="waktu_selesai_shift" value="{{ old('waktu_selesai_shift', $kasir->waktu_selesai_shift) }}"  lang="en-GB"required>
         </div>
 
         <button type="submit">Simpan</button>
@@ -94,4 +96,5 @@ document.getElementById('waktu_shift')
 });
 
 </script>
+
 @endsection

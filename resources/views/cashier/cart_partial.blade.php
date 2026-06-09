@@ -261,16 +261,19 @@ text-transform:uppercase;
 </div>
 
 <input 
-type="number" 
+type="text" 
 id="bayar" 
 placeholder="Uang bayar" 
+autocomplete="off"
 style="
+width:100%;
 margin-bottom:10px;
 border-radius:12px;
 border:3px solid #000;
 padding:12px;
 font-weight:bold;
 background:#fff;
+box-sizing:border-box;
 ">
 
 <input 
@@ -343,8 +346,11 @@ background:#fff;
 ">
 
 <option value="">Pilih Meja</option>
+@php
+$mej = $meja->where('status', 'nonaktif');
+@endphp
+@foreach($mej as $m)
 
-@foreach($meja as $m)
 <option value="{{ $m->nomor_meja }}">
 Meja {{ $m->nomor_meja }}
 </option>
@@ -371,7 +377,60 @@ letter-spacing:1px;
 </button>
 
 </form>
+<script>
+let metode = document.getElementById('metode');
+let cashArea = document.getElementById('cash-area');
 
+document.getElementById('metode_fix').value = metode.value;
+
+metode.addEventListener('change', function(){
+
+    document.getElementById('metode_fix').value = this.value;
+
+    if(this.value == 'cash'){
+        cashArea.style.display = 'block';
+    } else {
+        cashArea.style.display = 'none';
+    }
+});
+
+document.getElementById('bayar').addEventListener('input', function(){
+
+    let total = {{ $total }};
+
+    // ambil angka saja
+    let angka = this.value.replace(/[^0-9]/g, '');
+
+    // format rupiah
+    let format = new Intl.NumberFormat('id-ID').format(angka);
+
+    // tampilkan ke input
+    this.value = format;
+
+    // hitung asli
+    let bayar = parseInt(angka) || 0;
+
+    let kembali = bayar - total;
+
+    if(kembali >= 0){
+
+        document.getElementById('kembalian').value =
+        'Rp ' + new Intl.NumberFormat('id-ID').format(kembali);
+
+        // hidden input kirim angka asli
+        document.getElementById('bayar_fix').value = bayar;
+        document.getElementById('kembalian_fix').value = kembali;
+
+    } else {
+
+        document.getElementById('kembalian').value = "Uang kurang";
+
+        document.getElementById('bayar_fix').value = '';
+        document.getElementById('kembalian_fix').value = '';
+    }
+
+});
+</script>
 <script>
 let metode = document.getElementById('metode');
 let cashArea = document.getElementById('cash-area');

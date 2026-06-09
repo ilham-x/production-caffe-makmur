@@ -35,14 +35,11 @@
             <label>Kategori</label><br>
             <select name="kategori" required>
                 <option value="">Pilih Kategori</option>
-                    <option value="Kopi">Kopi</option>
-                    <option value="Non-Kopi">Non-Kopi</option>
-                    <option value="Soda">Soda</option>
-                    <option value="Makanan Ringan">Makanan Ringan</option>
-                    <option value="Tansu">Tansu</option>
-                    <option value="Roti Panggang">Roti Panggang</option>
-                    <option value="Makanan Berat">Makanan Berat</option>
-                    <option value="Mie Rebus/Goreng">Mie Rebus/Goreng</option>
+                    @foreach($kategoris as $kategori)
+                    <option value="{{ $kategori->nama_kategori }}" {{ old('kategori')==$kategori->nama_kategori?'selected':'' }}>
+                        {{ $kategori->nama_kategori }}  
+                    </option>
+                    @endforeach
             </select>
         </div>
 

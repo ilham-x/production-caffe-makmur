@@ -5,13 +5,17 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 class Pesanan extends Model
-{   protected $table = "pesanans";
+{
+    protected $table = "pesanans";
+
     protected $fillable = [
+
         'nomor_meja',
-         'nama_pelanggan',
+        'nama_pelanggan',
         'kode_pesanan',
         'status',
         'total_harga',
+        'refund_total',
         'metode_pembayaran'
     ];
 
@@ -20,12 +24,18 @@ class Pesanan extends Model
         return $this->belongsTo(Meja::class);
     }
 
-   public function produks()
-{
-    return $this->belongsToMany(Produk::class, 'pesanan_produk', 'pesanan_id', 'produk_id')
-                ->withPivot('qty', 'harga')
-                ->withTimestamps();
-}
+    public function produks()
+    {
+        return $this->belongsToMany(
+            Produk::class,
+            'pesanan_produk',
+            'pesanan_id',
+            'produk_id'
+        )
+        ->withPivot('qty', 'harga')
+        ->withTimestamps();
+    }
+
     public function transaksi()
     {
         return $this->hasOne(Transaksi::class);
@@ -35,8 +45,12 @@ class Pesanan extends Model
     {
         return $this->hasMany(Ulasan::class);
     }
+
     public function detail()
-{
-    return $this->hasMany(Detail_Pesanan::class, 'pesanan_id');
-}
+    {
+        return $this->hasMany(
+            Detail_Pesanan::class,
+            'pesanan_id'
+        );
+    }
 }

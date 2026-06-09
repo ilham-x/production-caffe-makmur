@@ -2,69 +2,78 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
 {
+    // GET /api/kasir?page=1
     public function index()
     {
-        $kasirs = User::where('role','cashier')->paginate(10);
-        return view('admin.kasir.index', compact('kasirs'));
+        $kasirs = User::where('role', 'cashier')
+            ->orderBy('created_at', 'desc')
+            ->paginate(10);
+
+        return response()->json($kasirs);
     }
 
-    public function create()
-    {
-        return view('admin.kasir.create');
-    }
-
+    // POST /api/kasir
     public function store(Request $request)
     {
-        $request->validate([
-            'name'=>'required|string|max:255',
-            'email'=>'required|email|unique:users',
-            'password'=>'required|min:6'
+        $validated = $request->validate([
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|min:6',
+            'role'     => 'sometimes|in:cashier,admin',
         ]);
 
-        User::create([
-            'name'=>$request->name,
-            'email'=>$request->email,
-            'password'=>Hash::make($request->password),
-            'role'=>'cashier'
+        $kasir = User::create([
+            'name'     => $validated['name'],
+            'email'    => $validated['email'],
+            'password' => Hash::make($validated['password']),
+            'role'     => $validated['role'] ?? 'cashier',
         ]);
 
-        return redirect()->route('admin.kasir.index')
-            ->with('success','Kasir berhasil ditambahkan');
+        return response()->json($kasir, 201);
     }
 
-    public function show(User $kasir)
-    {
-        return view('admin.kasir.show', compact('kasir'));
-    }
-
-    public function edit(User $kasir)
-    {
-        return view('admin.kasir.edit', compact('kasir'));
-    }
-
+    // PUT /api/kasir/{id}
     public function update(Request $request, User $kasir)
     {
-        $kasir->update([
-            'name'=>$request->name,
-            'email'=>$request->email
+        $validated = $request->validate([
+            'name'     => 'sometimes|required|string|max:255',
+            'email'    => 'sometimes|required|email|unique:users,email,' . $kasir->id,
+            'password' => 'sometimes|nullable|min:6',
+            'role'     => 'sometimes|in:cashier,admin',
         ]);
 
-        return redirect()->route('admin.kasir.index')
-            ->with('success','Kasir berhasil diupdate');
+        $kasir->name  = $validated['name']  ?? $kasir->name;
+        $kasir->email = $validated['email'] ?? $kasir->email;
+        $kasir->role  = $validated['role']  ?? $kasir->role;
+
+        // Password hanya diupdate kalau dikirim dan tidak kosong
+        if (!empty($validated['password'])) {
+            $kasir->password = Hash::make($validated['password']);
+        }
+
+        $kasir->save();
+
+        return response()->json($kasir);
     }
 
+    // DELETE /api/kasir/{id}
     public function destroy(User $kasir)
     {
+        // Jangan hapus diri sendiri
+        if (auth()->id() === $kasir->id) {
+            return response()->json([
+                'message' => 'Tidak bisa menghapus akun sendiri'
+            ], 403);
+        }
+
         $kasir->delete();
 
-        return redirect()->route('admin.kasir.index')
-            ->with('success','Kasir berhasil dihapus');
+        return response()->json(['message' => 'Kasir berhasil dihapus']);
     }
 }

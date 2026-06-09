@@ -2,28 +2,35 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Produk;
+use App\Models\Kategori;
 use Illuminate\Http\Request;
 
 class ProdukController extends Controller
 {
+    /**
+     * List semua produk
+     */
     public function index()
     {
         $produks = Produk::latest()->get();
-        return view('admin.produk.index', compact('produks'));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data produk berhasil diambil',
+            'data' => $produks
+        ]);
     }
 
-    public function create()
-    {
-        return view('admin.produk.create');
-    }
-
+    /**
+     * Simpan produk baru
+     */
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'nama_produk' => 'required|string|max:255',
             'harga' => 'required|numeric|min:0',
+            'kategori' => 'nullable|string',
             'gambar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048'
         ]);
 
@@ -33,51 +40,75 @@ class ProdukController extends Controller
             $gambarPath = $request->file('gambar')
                 ->store('produk', 'public');
         }
-          
 
-        Produk::create([
-            'nama_produk' => $request->nama_produk,
-            'harga' => $request->harga,
-           'kategori' => $request->kategori,
-            
-            'gambar' => $gambarPath
+        $produk = Produk::create([
+            'nama_produk' => $validated['nama_produk'],
+            'harga'       => $validated['harga'],
+            'kategori'    => $validated['kategori'] ?? null,
+            'gambar'      => $gambarPath
         ]);
 
-        return redirect()
-            ->route('admin.produk.index')
-            ->with('success','Produk berhasil ditambahkan');
+        return response()->json([
+            'success' => true,
+            'message' => 'Produk berhasil ditambahkan',
+            'data' => $produk
+        ], 201);
     }
-    
+
+    /**
+     * Detail produk
+     */
     public function show(Produk $produk)
     {
-        return view('admin.produk.show', compact('produk'));
+        return response()->json([
+            'success' => true,
+            'message' => 'Detail produk berhasil diambil',
+            'data' => $produk
+        ]);
     }
 
-    public function edit(Produk $produk)
-    {
-        return view('admin.produk.edit', compact('produk'));
-    }
-
+    /**
+     * Update produk
+     */
     public function update(Request $request, Produk $produk)
     {
-        $request->validate([
+        $validated = $request->validate([
             'nama_produk' => 'required|string|max:255',
             'harga' => 'required|numeric|min:0',
             'kategori' => 'nullable|string',
             'gambar' => 'nullable|image|mimes:jpg,jpeg,png|max:2048'
         ]);
 
-        $produk->update($request->all());
+        $data = [
+            'nama_produk' => $validated['nama_produk'],
+            'harga'       => $validated['harga'],
+            'kategori'    => $validated['kategori'] ?? null,
+        ];
 
-        return redirect()->route('admin.produk.index')
-            ->with('success','Produk berhasil diupdate');
+        if ($request->hasFile('gambar')) {
+            $data['gambar'] = $request->file('gambar')
+                ->store('produk', 'public');
+        }
+
+        $produk->update($data);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Produk berhasil diperbarui',
+            'data' => $produk->fresh()
+        ]);
     }
 
+    /**
+     * Hapus produk
+     */
     public function destroy(Produk $produk)
     {
         $produk->delete();
 
-        return redirect()->route('admin.produk.index')
-            ->with('success','Produk berhasil dihapus');
+        return response()->json([
+            'success' => true,
+            'message' => 'Produk berhasil dihapus'
+        ]);
     }
 }

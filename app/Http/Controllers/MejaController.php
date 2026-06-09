@@ -2,70 +2,99 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Controller;
 use App\Models\Meja;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 
 class MejaController extends Controller
 {
+    /**
+     * Tampilkan semua meja
+     */
     public function index()
     {
         $mejas = Meja::latest()->paginate(10);
-        return view('admin.meja.index', compact('mejas'));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Data meja berhasil diambil',
+            'data' => $mejas
+        ]);
     }
 
-    public function create()
-    {
-        return view('admin.meja.create');
-    }
-
+    /**
+     * Simpan meja baru
+     */
     public function store(Request $request)
     {
-        $request->validate([
-            'nomor_meja' => 'required|unique:mejas'
+        $validated = $request->validate([
+            'nomor_meja' => 'required|unique:mejas,nomor_meja'
+        ], [
+            'nomor_meja.required' => 'Nomor meja wajib diisi',
+            'nomor_meja.unique' => 'Nomor meja sudah digunakan'
         ]);
 
-        Meja::create([
-            'nomor_meja' => $request->nomor_meja,
-            'kode_qr' => Str::uuid(),
-            'status' => 'aktif'
+        $meja = Meja::create([
+            'nomor_meja' => $validated['nomor_meja'],
+            'kode_qr'     => Str::uuid(),
+            'status'      => 'aktif'
         ]);
 
-        return redirect()->route('admin.meja.index')
-            ->with('success','Meja berhasil ditambahkan');
+        return response()->json([
+            'success' => true,
+            'message' => 'Meja berhasil ditambahkan',
+            'data' => $meja
+        ], 201);
     }
 
-    public function show($id)
-{
-    $meja = \App\Models\Meja::findOrFail($id);
-    return view('admin.meja.show', compact('meja'));
-}
-    public function edit(Meja $meja)
+    /**
+     * Detail meja
+     */
+    public function show(Meja $meja)
     {
-        return view('admin.meja.edit', compact('meja'));
+        return response()->json([
+            'success' => true,
+            'message' => 'Detail meja berhasil diambil',
+            'data' => $meja
+        ]);
     }
 
+    /**
+     * Update data meja
+     */
     public function update(Request $request, Meja $meja)
     {
-        $request->validate([
-            'nomor_meja' => 'required|unique:mejas,nomor_meja,'.$meja->id
+        $validated = $request->validate([
+            'nomor_meja' => 'required|unique:mejas,nomor_meja,' . $meja->id,
+            'status' => 'required|in:aktif,non aktif'
+        ], [
+            'nomor_meja.required' => 'Nomor meja wajib diisi',
+            'nomor_meja.unique' => 'Nomor meja sudah dipakai',
+            'status.required' => 'Status wajib dipilih'
         ]);
 
         $meja->update([
-            'nomor_meja' => $request->nomor_meja,
-            'status' => $request->status
+            'nomor_meja' => $validated['nomor_meja'],
+            'status'     => $validated['status']
         ]);
 
-        return redirect()->route('admin.meja.index')
-            ->with('success','Meja berhasil diupdate');
+        return response()->json([
+            'success' => true,
+            'message' => 'Meja berhasil diperbarui',
+            'data' => $meja->fresh()
+        ]);
     }
 
+    /**
+     * Hapus meja
+     */
     public function destroy(Meja $meja)
     {
         $meja->delete();
 
-        return redirect()->route('admin.meja.index')
-            ->with('success','Meja berhasil dihapus');
+        return response()->json([
+            'success' => true,
+            'message' => 'Meja berhasil dihapus'
+        ]);
     }
 }

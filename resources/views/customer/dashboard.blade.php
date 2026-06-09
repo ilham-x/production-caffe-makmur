@@ -41,12 +41,11 @@ body{
 
 /* HEADER */
 .header{
- display:flex;
- justify-content:space-between;
- align-items:center;
- margin-bottom:20px;
- gap:10px;
- flex-wrap:wrap;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:15px;
+    flex-wrap:wrap;
 }
 
 h1{
@@ -798,7 +797,71 @@ input, select{
  font-weight:bold;
  color:#555;
 }
+.btn-komplain{
+    width:auto;
+    min-width:180px;
+    padding:12px 20px;
+    margin:0;
+    background:#ff3d71;
+    color:#fff;
+    font-size:14px;
+    font-weight:700;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+    white-space:nowrap;
+}
 
+.komplain-overlay{
+ position:fixed;
+ top:0;
+ left:0;
+ width:100%;
+ height:100%;
+ background:rgba(0,0,0,0.6);
+ display:none;
+ justify-content:center;
+ align-items:center;
+ z-index:3000;
+}
+
+.komplain-box{
+ background:#fff;
+ width:90%;
+ max-width:420px;
+ padding:20px;
+ border:3px solid #000;
+ border-radius:16px;
+ box-shadow:8px 8px 0 #000;
+}
+
+.komplain-box textarea{
+ width:100%;
+ min-height:120px;
+ resize:none;
+ margin-top:10px;
+}
+
+.komplain-actions{
+ display:flex;
+ gap:10px;
+ margin-top:15px;
+}
+.header-actions{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.btn-komplain{
+    width:auto;
+    min-width:180px;
+}
+
+.meja{
+    margin:0;
+}
 </style>
 </head>
 
@@ -807,8 +870,17 @@ input, select{
 <div class="container">
 
 <div class="header">
-<h1>🫘 Coffee Makmur</h1>
-<div class="meja">Meja {{ $nomor_meja }}</div>
+    <h1>🫘 Coffee Makmur</h1>
+
+    <div class="header-actions">
+        <button onclick="openKomplain()" class="btn-komplain">
+            ⚠ Komplain Pesanan
+        </button>
+
+        <div class="meja">
+            Meja {{ $nomor_meja }}
+        </div>
+    </div>
 </div>
 
 <!-- SEARCH -->
@@ -822,17 +894,67 @@ input, select{
 <form method="GET" class="filter-box">
 <select name="kategori" onchange="this.form.submit()">
 <option value="">-- Semua Kategori --</option>
-<option value="Kopi" {{ request('kategori')=='Kopi'?'selected':'' }}>Kopi</option>
-<option value="Non-Kopi" {{ request('kategori')=='Non-Kopi'?'selected':'' }}>Non-Kopi</option>
-<option value="Soda" {{ request('kategori')=='Soda'?'selected':'' }}>Soda</option>
-<option value="Makanan Ringan" {{ request('kategori')=='Makanan Ringan'?'selected':'' }}>Makanan Ringan</option>
-<option value="Tansu" {{ request('kategori')=='Tansu'?'selected':'' }}>Tansu</option>
-<option value="Roti Panggang" {{ request('kategori')=='Roti Panggang'?'selected':'' }}>Roti Panggang</option>
-<option value="Makanan Berat" {{ request('kategori')=='Makanan Berat'?'selected':'' }}>Makanan Berat</option>
-<option value="Mie Rebus/Goreng" {{ request('kategori')=='Mie Rebus/Goreng'?'selected':'' }}>Mie Rebus/Goreng</option>
+@foreach($kategoris as $kategori)
+    <option value="{{ $kategori->nama_kategori }}" {{ request('kategori')==$kategori->nama_kategori?'selected':'' }}>{{ $kategori->nama_kategori }}</option>
+@endforeach
 </select>
 </form>
 
+<!-- MODAL -->
+<div class="komplain-overlay" id="komplainModal">
+
+<div class="komplain-box">
+
+<h2>Ajukan Komplain</h2>
+
+<form action="{{ route('customer.komplain') }}" method="POST" enctype="multipart/form-data">
+
+@csrf
+
+<input type="hidden" name="pesanan_id" value="{{ $pesanan->id ?? '' }}">
+
+<label>Menu Bermasalah</label>
+
+<select name="produk_id" required>
+
+<option value="">Pilih Menu</option>
+
+@foreach($detailPesanan as $detail)
+
+<option value="{{ $detail->produk_id }}">
+{{ $detail->produk->nama_produk }}
+(x{{ $detail->qty }})
+</option>
+
+@endforeach
+
+</select>
+
+<textarea
+name="alasan"
+placeholder="Contoh: minuman tumpah, pesanan salah, dll"
+required
+></textarea>
+
+<input type="file" name="foto">
+
+<div class="komplain-actions">
+
+<button type="button" onclick="closeKomplain()">
+Batal
+</button>
+
+<button type="submit">
+Kirim
+</button>
+
+</div>
+
+</form>
+
+</div>
+
+</div>
 <div class="grid">
 
 <!-- LEFT -->
@@ -892,7 +1014,10 @@ input, select{
 <h3>Keranjang</h3>
 
 <div class="cart-items">
-@php $total = 0; @endphp
+@php 
+$total = 0;
+$totalItem = 0;
+@endphp
 
 @forelse($cart as $item)
 
@@ -945,7 +1070,7 @@ input, select{
 
 </div>
 
-@php $total += $item['harga'] * $item['qty']; @endphp
+@php $total += $item['harga'] * $item['qty']; $totalItem += $item['qty'];@endphp
 
 @empty
 <p>Kosong</p>
@@ -954,7 +1079,7 @@ input, select{
 <hr>
 
 <div class="total">Total: Rp {{ number_format($total) }}</div>
-
+Item : {{ $totalItem }}x
 <!-- FORM CHECKOUT DENGAN EVENT HANDLER -->
 <form id="checkoutForm" action="{{ route('customer.checkout') }}" method="POST" onsubmit="handleCheckout(event)">
 @csrf
@@ -1070,7 +1195,21 @@ input, select{
   </div>
 
 </footer>
+<script>
 
+function openKomplain(){
+ document
+ .getElementById('komplainModal')
+ .style.display='flex';
+}
+
+function closeKomplain(){
+ document
+ .getElementById('komplainModal')
+ .style.display='none';
+}
+
+</script>
 <script>
 // LOGIC JS TUTUP JAM (Tetap sama)
 const now = new Date();
