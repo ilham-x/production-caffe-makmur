@@ -10,6 +10,7 @@ use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CashierController;
 use App\Http\Controllers\KategoriController;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\UserController;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,7 +46,7 @@ Route::post('/xendit/callback', [CustomerController::class, 'callback']);
 | PROTECTED API
 |--------------------------------------------------------------------------
 */
-
+Route::apiResource('kategori', KategoriController::class);
 Route::middleware('auth:sanctum')->group(function () {
 
     // Logout*-]
@@ -103,7 +104,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('produk', ProdukController::class);
 
-    Route::apiResource('kategori', KategoriController::class);
+    
 
     Route::apiResource('meja', MejaController::class);
     Route::apiResource('kasir', UserController::class);
